@@ -41,7 +41,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mt-4">
               <h4 className="font-bold text-slate-800 text-sm mb-2">开发者寄语</h4>
               <p className="text-slate-500 text-xs italic">
-                "让写作回归内容本身，排版交给 AI。"
+                "剩下来的时间可以喝杯咖啡。"
               </p>
             </div>
             

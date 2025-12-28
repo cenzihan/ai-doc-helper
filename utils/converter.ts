@@ -230,7 +230,7 @@ export async function downloadDocx(markdown: string, template: WordTemplate, cus
                 sections.push(new Paragraph({
                     children: [
                         new ImageRun({
-                            data: imgData.data,
+                            data: new Uint8Array(imgData.data),
                             transformation: {
                                 width: finalWidth,
                                 height: finalHeight,
