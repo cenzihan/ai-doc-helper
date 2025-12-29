@@ -49,39 +49,119 @@ const FormulaOCR: React.FC<FormulaOCRProps> = ({ onResult }) => {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+  // 图片压缩处理函数
+  const processImage = (file: File | Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                
+                // 限制最大尺寸为 1600px，兼顾清晰度和体积
+                const MAX_DIMENSION = 1600;
+                
+                if (width > height) {
+                    if (width > MAX_DIMENSION) {
+                        height *= MAX_DIMENSION / width;
+                        width = MAX_DIMENSION;
+                    }
+                } else {
+                    if (height > MAX_DIMENSION) {
+                        width *= MAX_DIMENSION / height;
+                        height = MAX_DIMENSION;
+                    }
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    reject(new Error("Could not get canvas context"));
+                    return;
+                }
+                
+                // 绘制并压缩为 JPEG
+                ctx.drawImage(img, 0, 0, width, height);
+                // 0.8 质量通常足够 OCR 使用且体积很小
+                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                resolve(compressedDataUrl);
+            };
+            img.onerror = (e) => reject(e);
+            img.src = event.target?.result as string;
+        };
+        reader.onerror = (e) => reject(e);
+        reader.readAsDataURL(file);
+    });
+  };
+
+  const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
     const items = e.clipboardData.items;
     for (let i = 0; i < items.length; i++) {
       if (items[i].type.indexOf('image') !== -1) {
         const blob = items[i].getAsFile();
         if (blob) {
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            setImage(event.target?.result as string);
+          try {
+            const compressedImage = await processImage(blob);
+            setImage(compressedImage);
             resetResults();
-          };
-          reader.readAsDataURL(blob);
+          } catch (err) {
+            console.error("Image processing failed", err);
+            alert("图片处理失败");
+          }
         }
       }
     }
   }, []);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setImage(event.target?.result as string);
-        resetResults();
-      };
-      reader.readAsDataURL(file);
+        try {
+            const compressedImage = await processImage(file);
+            setImage(compressedImage);
+            resetResults();
+        } catch (err) {
+            console.error("Image processing failed", err);
+            alert("图片处理失败");
+        }
     }
+    if (e.target) e.target.value = '';
   };
 
   const resetResults = () => {
     setFormulaResult(null);
     setTableResult(null);
     setHandwritingResult(null);
+  };
+
+  // Helper to safely extract JSON from AI response
+  const parseJsonSafe = (text: string) => {
+      let clean = text.trim();
+      
+      // 1. Try to extract from markdown code blocks
+      const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)(?:```|$)/;
+      const match = clean.match(codeBlockRegex);
+      if (match && match[1]) {
+          clean = match[1].trim();
+      }
+
+      // 2. If no code block or extraction failed, try finding the outer braces
+      const start = clean.indexOf('{');
+      const end = clean.lastIndexOf('}');
+      if (start !== -1 && end !== -1) {
+          clean = clean.substring(start, end + 1);
+      }
+
+      try {
+          return JSON.parse(clean);
+      } catch (e) {
+          console.error("JSON Parse Error. Raw text:", text, "Cleaned text:", clean);
+          throw new Error("Invalid JSON structure in response.");
+      }
   };
 
   // 1. 生成数学公式示例图片
@@ -267,83 +347,96 @@ const FormulaOCR: React.FC<FormulaOCRProps> = ({ onResult }) => {
     resetResults();
 
     try {
-      const base64Data = image.split(',')[1];
+      // Data URL format: data:[<mediatype>][;base64],<data>
+      const split = image.split(',');
+      const meta = split[0]; 
+      const base64Data = split[1];
       
+      let mimeType = 'image/png';
+      const mimeMatch = meta.match(/data:([^;]+);/);
+      if (mimeMatch) {
+          mimeType = mimeMatch[1];
+      }
+
       if (mode === 'formula') {
+          // Formula mode keeps using JSON for structured output
           const responseText = await generateContent({
             apiKey: config.apiKey,
             model: config.model,
             baseUrl: config.baseUrl,
             image: base64Data,
-            prompt: '请识别图片中的数学公式，并提供四种格式的 JSON 输出：\n1. inline (必须使用单美元符号 $ 包裹的行内公式，例如 $E=mc^2$)\n2. block (必须使用双美元符号 $$ 包裹的独立块公式，例如 $$E=mc^2$$)\n3. raw (不带任何美元符号的纯 LaTeX 代码)\n4. html (MathML 代码格式)',
+            mimeType: mimeType,
+            prompt: 'Identify the mathematical formula in the image. Output strictly valid JSON with 4 fields: "inline" ($...$), "block" ($$...$$), "raw" (pure latex), "html" (mathml). No markdown formatting outside the JSON.',
             jsonSchema: {
                 type: Type.OBJECT,
                 properties: {
-                  inline: { type: Type.STRING, description: 'Inline LaTeX string strictly wrapped with $...$' },
-                  block: { type: Type.STRING, description: 'Block LaTeX string strictly wrapped with $$...$$' },
-                  raw: { type: Type.STRING, description: 'Raw LaTeX code without delimiters' },
-                  html: { type: Type.STRING, description: 'MathML code for the formula' }
+                  inline: { type: Type.STRING },
+                  block: { type: Type.STRING },
+                  raw: { type: Type.STRING },
+                  html: { type: Type.STRING }
                 },
                 required: ['inline', 'block', 'raw', 'html']
             }
           });
           
-          let cleanJson = responseText.trim().replace(/^```json\s*|```$/g, '');
-          const data = JSON.parse(cleanJson);
+          const data = parseJsonSafe(responseText);
           setFormulaResult(data);
           setActiveFormulaTab('block');
 
       } else if (mode === 'table') {
-          const prompt = `Analyze this image containing text and tables.
-          Output JSON: { "markdown": "...", "html": "..." }`;
+          // Table mode switches to RAW TEXT to avoid JSON errors with large content
+          const prompt = `Analyze this image containing a table or document layout.
+          Output strictly the content in Markdown format. 
+          Use standard Markdown tables.
+          Do not wrap the output in JSON. Just return the Markdown text.`;
 
           const responseText = await generateContent({
               apiKey: config.apiKey,
               model: config.model,
               baseUrl: config.baseUrl,
               image: base64Data,
-              prompt: prompt,
-              jsonSchema: {
-                  type: Type.OBJECT,
-                  properties: {
-                      markdown: { type: Type.STRING, description: 'Content in Markdown format with tables' },
-                      html: { type: Type.STRING, description: 'Content in HTML format with table tags' }
-                  },
-                  required: ['markdown', 'html']
-              }
+              mimeType: mimeType,
+              prompt: prompt
+              // No jsonSchema here
           });
 
-          let cleanJson = responseText.trim().replace(/^```json\s*|```$/g, '');
-          const data = JSON.parse(cleanJson);
-          setTableResult(data);
+          if (!responseText || responseText.length < 5) {
+             throw new Error("Empty response");
+          }
+
+          setTableResult({
+              markdown: responseText,
+              html: responseText // We will just render markdown as preview
+          });
           setActiveTableTab('preview');
           
       } else if (mode === 'handwriting') {
+          // Handwriting mode switches to RAW TEXT
           const responseText = await generateContent({
               apiKey: config.apiKey,
               model: config.model,
               baseUrl: config.baseUrl,
               image: base64Data,
-              prompt: 'Transcribe the handwritten text in this image. Output two formats: "markdown" (preserving structure, lists, bold) and "html" (using proper tags like <p>, <ul>, <strong>).',
-              jsonSchema: {
-                  type: Type.OBJECT,
-                  properties: {
-                      markdown: { type: Type.STRING, description: 'Transcribed text in Markdown format' },
-                      html: { type: Type.STRING, description: 'Transcribed text in HTML format' }
-                  },
-                  required: ['markdown', 'html']
-              }
+              mimeType: mimeType,
+              prompt: 'Transcribe the handwritten text in this image into clear Markdown format. Preserve lists, headings, and emphasis. Do not wrap in JSON, just return the text.',
+              // No jsonSchema here
           });
 
-          let cleanJson = responseText.trim().replace(/^```json\s*|```$/g, '');
-          const data = JSON.parse(cleanJson);
-          setHandwritingResult(data);
+          if (!responseText || responseText.length < 5) {
+             throw new Error("Empty response");
+          }
+
+          setHandwritingResult({
+              markdown: responseText,
+              html: responseText
+          });
           setActiveHandwritingTab('preview');
       }
 
-    } catch (err) {
+    } catch (err: any) {
       console.error('OCR Error:', err);
-      alert('识别失败，请检查 API Key 配额或网络连接。');
+      // User requested specific error message
+      alert('识别失败：图片可能模糊或内容无法识别，请尝试更换质量更好的图片。');
     } finally {
       setIsAnalyzing(false);
     }
@@ -421,7 +514,7 @@ const FormulaOCR: React.FC<FormulaOCRProps> = ({ onResult }) => {
                     )}
                 </div>
                 <h4 className="text-slate-800 font-bold text-xl mb-2">粘贴截图或点击上传</h4>
-                <p className="text-slate-400 text-sm">支持 PNG/JPG 格式</p>
+                <p className="text-slate-400 text-sm">支持 PNG/JPG (自动压缩)</p>
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
                 
                 <button 
@@ -434,7 +527,7 @@ const FormulaOCR: React.FC<FormulaOCRProps> = ({ onResult }) => {
                         : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
                     }`}
                 >
-                    {mode === 'formula' ? '加载示例 (Math)' : mode === 'table' ? '加载示例 (Table)' : '加载示例 (Handwriting)'}
+                    加载示例 (Sample)
                 </button>
               </div>
             )}
@@ -482,7 +575,6 @@ const FormulaOCR: React.FC<FormulaOCRProps> = ({ onResult }) => {
                             </div>
                         ) : (
                            <div className="text-xs text-slate-500 p-4 w-full h-full overflow-auto">
-                               {/* Render HTML content safely if possible, or just preview */}
                                <div dangerouslySetInnerHTML={{ __html: formulaResult.html }} />
                            </div>
                         )}
@@ -507,9 +599,6 @@ const FormulaOCR: React.FC<FormulaOCRProps> = ({ onResult }) => {
                         <button onClick={() => setActiveTableTab('markdown')} className={`px-4 py-1.5 rounded-lg text-xs font-bold ${activeTableTab === 'markdown' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-500'}`}>
                             Markdown 源码
                         </button>
-                        <button onClick={() => setActiveTableTab('html')} className={`px-4 py-1.5 rounded-lg text-xs font-bold ${activeTableTab === 'html' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-500'}`}>
-                            HTML 源码
-                        </button>
                     </div>
 
                     <div className="flex-1 border border-slate-200 rounded-xl p-4 overflow-auto bg-white custom-scrollbar">
@@ -531,9 +620,7 @@ const FormulaOCR: React.FC<FormulaOCRProps> = ({ onResult }) => {
                         {activeTableTab === 'markdown' && (
                             <pre className="text-xs font-mono text-slate-700 whitespace-pre-wrap">{tableResult.markdown}</pre>
                         )}
-                        {activeTableTab === 'html' && (
-                            <pre className="text-xs font-mono text-slate-700 whitespace-pre-wrap">{tableResult.html}</pre>
-                        )}
+                        {/* No HTML source tab for simplicity in raw text mode */}
                     </div>
                 </div>
               ) : (
@@ -555,9 +642,6 @@ const FormulaOCR: React.FC<FormulaOCRProps> = ({ onResult }) => {
                           <button onClick={() => setActiveHandwritingTab('markdown')} className={`px-4 py-1.5 rounded-lg text-xs font-bold ${activeHandwritingTab === 'markdown' ? 'bg-white text-amber-600 shadow-sm' : 'text-amber-800/50'}`}>
                               Markdown
                           </button>
-                          <button onClick={() => setActiveHandwritingTab('html')} className={`px-4 py-1.5 rounded-lg text-xs font-bold ${activeHandwritingTab === 'html' ? 'bg-white text-amber-600 shadow-sm' : 'text-amber-800/50'}`}>
-                              HTML
-                          </button>
                       </div>
 
                       <div className="flex-1 border border-slate-200 rounded-xl p-4 overflow-auto bg-white custom-scrollbar">
@@ -571,13 +655,6 @@ const FormulaOCR: React.FC<FormulaOCRProps> = ({ onResult }) => {
                                   className="w-full h-full p-0 text-slate-700 resize-none focus:outline-none font-mono text-sm bg-transparent"
                                   readOnly
                                   value={handwritingResult.markdown}
-                              />
-                          )}
-                          {activeHandwritingTab === 'html' && (
-                              <textarea 
-                                  className="w-full h-full p-0 text-slate-700 resize-none focus:outline-none font-mono text-sm bg-transparent"
-                                  readOnly
-                                  value={handwritingResult.html}
                               />
                           )}
                       </div>
@@ -596,8 +673,8 @@ const FormulaOCR: React.FC<FormulaOCRProps> = ({ onResult }) => {
                 <button 
                     onClick={() => {
                         if (mode === 'formula' && formulaResult) handleCopy(formulaResult[activeFormulaTab]);
-                        if (mode === 'table' && tableResult) handleCopy(activeTableTab === 'html' ? tableResult.html : tableResult.markdown);
-                        if (mode === 'handwriting' && handwritingResult) handleCopy(activeHandwritingTab === 'html' ? handwritingResult.html : handwritingResult.markdown);
+                        if (mode === 'table' && tableResult) handleCopy(tableResult.markdown);
+                        if (mode === 'handwriting' && handwritingResult) handleCopy(handwritingResult.markdown);
                     }} 
                     className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all flex items-center ${
                         copyStatus === 'copied' 

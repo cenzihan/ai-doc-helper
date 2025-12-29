@@ -8,6 +8,7 @@ export interface AIRequest {
   prompt: string;
   systemInstruction?: string;
   image?: string; // base64 string without data URI prefix (for Gemini) or full handling
+  mimeType?: string; // e.g. 'image/png' or 'image/jpeg'
   jsonSchema?: any; // For Gemini schema or OpenAI json_object mode hint
 }
 
@@ -15,6 +16,8 @@ export interface AIRequest {
  * Unified function to call either Google Gemini SDK or OpenAI-compatible API (e.g. Alibaba DashScope)
  */
 export async function generateContent(req: AIRequest): Promise<string> {
+  const mimeType = req.mimeType || 'image/png';
+
   // ---------------------------------------------------------
   // 1. OpenAI Compatible Mode (For Alibaba Qwen, DeepSeek, etc.)
   // ---------------------------------------------------------
@@ -33,7 +36,7 @@ export async function generateContent(req: AIRequest): Promise<string> {
       // OpenAI/Compatible standard usually expects data URI for images
       content.push({
         type: 'image_url',
-        image_url: { url: `data:image/png;base64,${req.image}` }
+        image_url: { url: `data:${mimeType};base64,${req.image}` }
       });
     }
     
@@ -97,7 +100,7 @@ export async function generateContent(req: AIRequest): Promise<string> {
   
   const parts: any[] = [];
   if (req.image) {
-    parts.push({ inlineData: { mimeType: 'image/png', data: req.image } });
+    parts.push({ inlineData: { mimeType: mimeType, data: req.image } });
   }
   parts.push({ text: req.prompt });
 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -140,15 +139,15 @@ const WordPreview: React.FC<WordPreviewProps> = ({ markdown, isProcessing, progr
           style={{ transform: `scale(${scale})` }}
         >
           {/* Main Word Preview Area */}
-          <div className={`w-[210mm] min-h-[297mm] transition-all duration-500 ${getTemplateStyles()} prose prose-slate`}>
+          <div className={`w-[210mm] min-h-[297mm] transition-all duration-500 ${getTemplateStyles()} prose prose-slate break-words`}>
             <ReactMarkdown 
               remarkPlugins={[remarkGfm, remarkMath]} 
               rehypePlugins={[rehypeKatex]}
               components={{
                 h1: ({node, ...props}) => <h1 className="text-4xl font-bold mb-10 text-center text-slate-900 border-b-0 pb-0" {...props} />,
-                h2: ({node, ...props}) => <h2 className="text-2xl font-bold mt-10 mb-5 border-b-2 border-slate-900 pb-2" {...props} />,
-                h3: ({node, ...props}) => <h3 className="text-xl font-bold mt-8 mb-4 text-slate-800" {...props} />,
-                p: ({node, ...props}) => <p className="mb-4 text-justify leading-relaxed text-slate-800" {...props} />,
+                h2: ({node, ...props}) => <h2 className="text-2xl font-bold mt-10 mb-5 border-b-2 border-slate-900 pb-2 break-words" {...props} />,
+                h3: ({node, ...props}) => <h3 className="text-xl font-bold mt-8 mb-4 text-slate-800 break-words" {...props} />,
+                p: ({node, ...props}) => <p className="mb-4 text-justify leading-relaxed text-slate-800 break-words" {...props} />,
                 img: ({node, ...props}) => <img className="mx-auto rounded-lg shadow-md max-h-[500px]" {...props} />,
                 table: ({node, ...props}) => (
                   <div className="overflow-x-auto my-6">
@@ -164,11 +163,14 @@ const WordPreview: React.FC<WordPreviewProps> = ({ markdown, isProcessing, progr
                   const inline = props.inline;
                   if (inline) return <code className="bg-slate-100 px-1.5 py-0.5 rounded text-pink-700 font-mono text-[0.9em]" {...props}>{children}</code>;
                   return (
-                    <pre className="bg-[#f8fafc] text-slate-800 p-5 rounded border border-slate-200 overflow-x-auto my-6 text-[0.85em] font-mono">
+                    <pre className="bg-[#f8fafc] text-slate-800 p-5 rounded border border-slate-200 overflow-x-auto my-6 text-[0.85em] font-mono whitespace-pre-wrap break-all">
                       <code {...props}>{children}</code>
                     </pre>
                   );
-                }
+                },
+                // Explicitly handle math nodes to avoid object rendering errors
+                math: ({value, children}: any) => <div className="my-4 text-center">{children || value}</div>,
+                inlineMath: ({value, children}: any) => <span className="mx-1">{children || value}</span>
               }}
             >
               {markdown}
@@ -194,7 +196,10 @@ const WordPreview: React.FC<WordPreviewProps> = ({ markdown, isProcessing, progr
                             const inline = props.inline;
                             if (inline) return <code style={{ backgroundColor: '#f3f4f6', padding: '2px 6px', borderRadius: '4px', color: '#d63384', fontFamily: 'monospace', fontSize: '14px' }} {...props}>{children}</code>;
                             return <pre style={{ backgroundColor: '#1e1e1e', color: '#d4d4d4', padding: '15px', borderRadius: '8px', overflowX: 'auto', margin: '20px 0', fontSize: '13px', lineHeight: '1.5' }}><code {...props}>{children}</code></pre>;
-                        }
+                        },
+                        // Explicitly handle math nodes for WeChat view as well
+                        math: ({value, children}: any) => <div style={{margin: '16px 0', textAlign: 'center'}}>{children || value}</div>,
+                        inlineMath: ({value, children}: any) => <span style={{margin: '0 4px'}}>{children || value}</span>
                     }}
                 >
                     {markdown}
