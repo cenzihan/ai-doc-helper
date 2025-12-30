@@ -53,6 +53,7 @@ const FormulaOCR: React.FC<FormulaOCRProps> = ({ onResult }) => {
   const [mode, setMode] = useState<OCRMode>('formula');
   const [image, setImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   
   // Results State
   const [formulaResult, setFormulaResult] = useState<FormulaResult | null>(null);
@@ -345,6 +346,32 @@ const FormulaOCR: React.FC<FormulaOCRProps> = ({ onResult }) => {
       }
     }
   }, [mode]);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+  
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+  
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0 && mode !== 'pdf') {
+      const file = e.dataTransfer.files[0];
+      try {
+        const compressedImage = await processImage(file);
+        setImage(compressedImage);
+        resetResults();
+      } catch (err) {
+        console.error("Image processing failed", err);
+        alert("图片处理失败");
+      }
+    }
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -740,13 +767,22 @@ const FormulaOCR: React.FC<FormulaOCRProps> = ({ onResult }) => {
                 </div>
               )
           ) : (
-              // Image Uploader
-              <div className="bg-white border-2 border-dashed border-slate-300 rounded-3xl flex-1 flex flex-col items-center justify-center relative overflow-hidden group hover:border-[var(--primary-color)] hover:bg-[var(--primary-50)] transition-all duration-300 shadow-sm min-h-[400px]">
+              // Image Uploader with Drag & Drop
+              <div
+                className={`bg-white border-2 rounded-3xl flex-1 flex flex-col items-center justify-center relative overflow-hidden shadow-sm min-h-[400px] transition-all ${
+                  isDragOver
+                      ? 'border-solid border-[var(--primary-color)] bg-[var(--primary-50)]'
+                      : 'border-dashed border-slate-300 group hover:border-[var(--primary-color)] hover:bg-[var(--primary-50)] duration-300'
+                }`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
                 {image ? (
                   <>
                     <img src={image} alt="Preview" className="max-h-full max-w-full object-contain p-6" />
                     <div className="absolute top-4 right-4">
-                      <button onClick={() => { setImage(null); resetResults(); }} className="bg-red-500 text-white p-2 rounded-full shadow-lg hover:bg-red-600 transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                      <button onClick={() => { setImage(null); resetResults(); setIsDragOver(false); }} className="bg-red-500 text-white p-2 rounded-full shadow-lg hover:bg-red-600 transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
                     </div>
                   </>
                 ) : (
@@ -754,9 +790,15 @@ const FormulaOCR: React.FC<FormulaOCRProps> = ({ onResult }) => {
                     <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform ${mode === 'table' ? 'bg-green-50 text-green-600' : mode === 'handwriting' ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-400 group-hover:text-[var(--primary-color)] group-hover:bg-[var(--primary-50)]'}`}>
                         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                     </div>
-                    <h4 className="text-slate-800 font-bold text-xl mb-2">粘贴截图或点击上传</h4>
+                    <h4 className="text-slate-800 font-bold text-xl mb-2">粘贴截图、点击或拖拽上传</h4>
                     <p className="text-slate-400 text-sm">支持 PNG/JPG (自动压缩)</p>
                     <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
+                    
+                    {isDragOver && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-[var(--primary-color)]/10 backdrop-blur-sm z-10">
+                        <span className="text-2xl font-bold text-[var(--primary-color)] animate-pulse">释放即可上传图片 📥</span>
+                      </div>
+                    )}
                     
                     <button 
                         onClick={(e) => { e.stopPropagation(); handleLoadSample(); }}

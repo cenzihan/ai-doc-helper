@@ -102,7 +102,22 @@ const MultiDocProcessor: React.FC = () => {
   const [mode, setMode] = useState<Mode>('rename');
   const [files, setFiles] = useState<FileItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState<'preparing' | 'analyzing' | 'streaming' | 'completed' | null>(null);
+  const [progressText, setProgressText] = useState<string>('');
+  const [shouldStop, setShouldStop] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [resultReport, setResultReport] = useState<string>('');
+  
+  // History Management
+  interface HistoryItem {
+    id: string;
+    mode: Mode;
+    timestamp: number;
+    result: string;
+    fileCount: number;
+  }
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
   
   // Research Mode
   const [templates, setTemplates] = useState<ResearchTemplate[]>(RESEARCH_TEMPLATES);
@@ -143,6 +158,16 @@ const MultiDocProcessor: React.FC = () => {
             setTemplates([...RESEARCH_TEMPLATES, ...parsed]);
         } catch (e) {
             console.error("Failed to load custom templates", e);
+        }
+    }
+    
+    // Load history
+    const savedHistory = localStorage.getItem('multidoc_history');
+    if (savedHistory) {
+        try {
+            setHistory(JSON.parse(savedHistory));
+        } catch (e) {
+            console.error("Failed to load history", e);
         }
     }
   }, []);
@@ -236,13 +261,15 @@ const MultiDocProcessor: React.FC = () => {
       }
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement> | DataTransfer) => {
+    const isChangeEvent = 'target' in e;
+    const fileList = isChangeEvent ? (e as React.ChangeEvent<HTMLInputElement>).target?.files : (e as DataTransfer).files;
+    if (fileList) {
       const newFiles: FileItem[] = [];
       const isDeepResearch = mode === 'deep_research';
 
-      for (let i = 0; i < e.target.files.length; i++) {
-        const file = e.target.files[i];
+      for (let i = 0; i < fileList.length; i++) {
+        const file = fileList[i];
         
         // Parse content
         const content = await parseFile(file);
@@ -256,7 +283,28 @@ const MultiDocProcessor: React.FC = () => {
       }
       setFiles(prev => [...prev, ...newFiles]);
     }
-    if (e.target) e.target.value = '';
+    if (isChangeEvent) {
+      (e as React.ChangeEvent<HTMLInputElement>).target.value = '';
+    }
+  };
+  
+  // Drag and Drop Handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+  
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+  
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFileSelect(e.dataTransfer);
+    }
   };
 
   const handleRosterImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -375,7 +423,34 @@ const MultiDocProcessor: React.FC = () => {
     setFiles([]);
     setResultReport('');
     setCheckResult(null);
+    setProgressText('');
+    setProcessingStatus(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+  
+  const saveToHistory = (currentMode: Mode, result: string) => {
+    const newItem: HistoryItem = {
+      id: Date.now().toString(),
+      mode: currentMode,
+      timestamp: Date.now(),
+      result: result,
+      fileCount: files.length
+    };
+    
+    const newHistory = [newItem, ...history].slice(0, 5); // Keep only last 5
+    setHistory(newHistory);
+    localStorage.setItem('multidoc_history', JSON.stringify(newHistory));
+  };
+  
+  const loadFromHistory = (item: HistoryItem) => {
+    setResultReport(item.result);
+    setShowHistory(false);
+  };
+  
+  const deleteHistoryItem = (id: string) => {
+    const newHistory = history.filter(h => h.id !== id);
+    setHistory(newHistory);
+    localStorage.setItem('multidoc_history', JSON.stringify(newHistory));
   };
 
   // --- Process Functions ---
@@ -419,11 +494,32 @@ const MultiDocProcessor: React.FC = () => {
   const processReport = async () => {
     if (files.length === 0) return;
     setIsProcessing(true);
+    setShouldStop(false);
     setResultReport('');
+    setProcessingStatus('preparing');
+    setProgressText(`📚 正在准备 ${files.length} 个文件...`);
     
     try {
+      setProcessingStatus('analyzing');
+      setProgressText(`🔍 正在分析 ${files.length} 个文件内容...`);
+      
+      // Simulate file analysis progress
+      for (let i = 0; i < files.length; i++) {
+        if (shouldStop) {
+          setProcessingStatus('completed');
+          setProgressText('');
+          setIsProcessing(false);
+          return;
+        }
+        setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'processing' } : f));
+        await new Promise(resolve => setTimeout(resolve, 300)); // Small delay for UI update
+      }
+      
       const combinedContent = files.map((f, idx) => `--- Report ${idx + 1} (${f.file.name}) ---\n${f.contentSnippet}`).join('\n\n');
       const prompt = `${reportPrompt}\n\nReports Content:\n${combinedContent}`;
+      
+      setProcessingStatus('streaming');
+      setProgressText('✍️ AI 正在生成周报内容...');
       
       // Use streaming for real-time output
       const stream = generateContentStream({
@@ -435,14 +531,35 @@ const MultiDocProcessor: React.FC = () => {
       
       let fullText = '';
       for await (const chunk of stream) {
+        if (shouldStop) {
+          setProgressText('⏸️ 已停止生成');
+          setProcessingStatus('completed');
+          setIsProcessing(false);
+          return;
+        }
         fullText += chunk;
         setResultReport(fullText);
       }
       
       setFiles(prev => prev.map(f => ({ ...f, status: 'done' })));
+      setProcessingStatus('completed');
+      setProgressText('✅ 周报生成完成！');
+      
+      // Save to history
+      saveToHistory('report', fullText);
+      
+      setTimeout(() => {
+        setProcessingStatus(null);
+        setProgressText('');
+      }, 3000);
     } catch (e) {
       console.error(e);
-      alert("生成报告失败");
+      setProgressText('❌ 生成失败，请重试');
+      setProcessingStatus('completed');
+      setTimeout(() => {
+        setProcessingStatus(null);
+        setProgressText('');
+      }, 3000);
     } finally {
       setIsProcessing(false);
     }
@@ -496,9 +613,27 @@ const MultiDocProcessor: React.FC = () => {
   const processDeepResearch = async () => {
       if (files.length === 0) return;
       setIsProcessing(true);
+      setShouldStop(false);
       setResultReport('');
+      setProcessingStatus('preparing');
+      setProgressText(`📚 正在准备 ${files.length} 个文档...`);
       
       try {
+          setProcessingStatus('analyzing');
+          setProgressText(`🔍 正在深度分析 ${files.length} 个文档...`);
+          
+          // Simulate file analysis progress
+          for (let i = 0; i < files.length; i++) {
+              if (shouldStop) {
+                  setProcessingStatus('completed');
+                  setProgressText('');
+                  setIsProcessing(false);
+                  return;
+              }
+              setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'processing' } : f));
+              await new Promise(resolve => setTimeout(resolve, 300)); // Small delay for UI update
+          }
+          
           // Combine all file contents
           let combinedDocs = '';
           files.forEach((f, i) => {
@@ -506,6 +641,9 @@ const MultiDocProcessor: React.FC = () => {
           });
 
           const prompt = `${customPrompt}\n\nDocuments to Analyze:\n${combinedDocs}`;
+          
+          setProcessingStatus('streaming');
+          setProgressText('✍️ AI 正在生成深度研究报告...');
           
           // Use streaming for real-time output
           const stream = generateContentStream({
@@ -517,15 +655,36 @@ const MultiDocProcessor: React.FC = () => {
           
           let fullText = '';
           for await (const chunk of stream) {
+              if (shouldStop) {
+                  setProgressText('⏸️ 已停止生成');
+                  setProcessingStatus('completed');
+                  setIsProcessing(false);
+                  return;
+              }
               fullText += chunk;
               setResultReport(fullText);
           }
           
           setFiles(prev => prev.map(f => ({ ...f, status: 'done' })));
+          setProcessingStatus('completed');
+          setProgressText('✅ 深度调研完成！');
+          
+          // Save to history
+          saveToHistory('deep_research', fullText);
+          
+          setTimeout(() => {
+              setProcessingStatus(null);
+              setProgressText('');
+          }, 3000);
 
       } catch (e) {
           console.error(e);
-          alert("深度调研生成失败，请检查文档大小或 API 配额。");
+          setProgressText('❌ 生成失败，请检查文档大小或 API 配额。');
+          setProcessingStatus('completed');
+          setTimeout(() => {
+              setProcessingStatus(null);
+              setProgressText('');
+          }, 3000);
       } finally {
           setIsProcessing(false);
       }
@@ -675,7 +834,22 @@ const MultiDocProcessor: React.FC = () => {
                     {mode === 'deep_research' && '支持 PDF/Word/Excel/代码，智能生成学术级调研报告或分析文档。'}
                 </p>
             </div>
-            <div className="flex space-x-3 w-full md:w-auto">
+            <div className="flex space-x-3 w-full md:w-auto flex-wrap gap-y-2">
+                {/* History Button */}
+                {(mode === 'report' || mode === 'deep_research') && (
+                    <button
+                        onClick={() => setShowHistory(!showHistory)}
+                        className="flex-1 md:flex-none flex items-center justify-center px-3 py-2 text-xs font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors relative"
+                    >
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        历史记录
+                        {history.length > 0 && (
+                            <span className="absolute -top-1 -right-1 w-4 h-4 bg-[var(--primary-color)] text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                                {history.length}
+                            </span>
+                        )}
+                    </button>
+                )}
                  <button
                     onClick={openSettings}
                     className="flex-1 md:flex-none flex items-center justify-center px-3 py-2 text-xs font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors"
@@ -683,12 +857,12 @@ const MultiDocProcessor: React.FC = () => {
                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                      配置 Prompt
                  </button>
-                 <button 
+                 <button
                     onClick={() => fileInputRef.current?.click()}
                     className="flex-1 md:flex-none bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-all flex items-center justify-center"
                  >
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                    添加文件
+                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                     添加文件
                  </button>
                  <input type="file" multiple ref={fileInputRef} className="hidden" onChange={handleFileSelect} accept={mode === 'deep_research' ? ".pdf,.docx,.xlsx,.xls,.txt,.md,.py,.js,.java,.c,.cpp" : ".docx,.txt,.md"} />
             </div>
@@ -813,13 +987,30 @@ const MultiDocProcessor: React.FC = () => {
                         </div>
                     </div>
                 ) : (
-                    // Empty State
-                    <div className="flex-1 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-slate-400 min-h-[200px] group hover:border-[var(--primary-color)] hover:bg-[var(--primary-50)] transition-all relative">
+                    // Empty State with Drag & Drop
+                    <div
+                        className={`flex-1 border-2 border-dashed rounded-xl flex flex-col items-center justify-center text-slate-400 min-h-[200px] group transition-all relative ${
+                            isDragOver
+                                ? 'border-[var(--primary-color)] bg-[var(--primary-50)]'
+                                : 'border-slate-200 hover:border-[var(--primary-color)] hover:bg-[var(--primary-50)]'
+                        }`}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                    >
                          <div className="absolute inset-0 cursor-pointer" onClick={() => fileInputRef.current?.click()}></div>
-                         <svg className="w-10 h-10 mb-2 opacity-50 group-hover:text-[var(--primary-color)] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                         <span className="text-xs">点击上传文件 {mode === 'deep_research' ? '(支持 PDF, Docx, Excel, Code)' : ''}</span>
+                         <svg className="w-10 h-10 mb-2 opacity-50 group-hover:text-[var(--primary-color)] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                         </svg>
+                         <span className="text-xs">点击或拖拽上传文件 {mode === 'deep_research' ? '(支持 PDF, Docx, Excel, Code)' : ''}</span>
+                        
+                        {isDragOver && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-[var(--primary-color)]/10 backdrop-blur-sm z-10">
+                                <span className="text-lg font-bold text-[var(--primary-color)]">释放即可上传 📥</span>
+                            </div>
+                        )}
                          
-                         <button 
+                         <button
                             onClick={(e) => { e.stopPropagation(); loadSampleFiles(); }}
                             className="mt-4 px-3 py-1.5 rounded-full bg-white text-[var(--primary-color)] text-xs font-bold border border-[var(--primary-color)] hover:bg-[var(--primary-color)] hover:text-white transition-all relative z-10"
                         >
@@ -828,6 +1019,33 @@ const MultiDocProcessor: React.FC = () => {
                     </div>
                 )}
                 
+                {/* Progress Bar */}
+                {processingStatus && (
+                    <div className="mb-4 p-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 animate-in slide-in-from-bottom-2 duration-300">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                                {processingStatus === 'preparing' && (
+                                    <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                                )}
+                                {processingStatus === 'analyzing' && (
+                                    <svg className="w-6 h-6 text-blue-500 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                                )}
+                                {processingStatus === 'streaming' && (
+                                    <svg className="w-6 h-6 text-green-500 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                )}
+                                <span className="text-sm font-bold text-slate-700">{progressText}</span>
+                            </div>
+                            <button
+                                onClick={() => setShouldStop(true)}
+                                className="px-3 py-1.5 bg-red-100 hover:bg-red-200 border border-red-300 text-red-600 text-xs font-bold rounded-lg transition-colors flex items-center"
+                            >
+                                <svg className="w-3 h-3 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" /></svg>
+                                停止
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {/* Action Button */}
                 <div className="mt-6">
                     <button
@@ -835,12 +1053,12 @@ const MultiDocProcessor: React.FC = () => {
                         disabled={files.length === 0 || isProcessing || (mode === 'missing' && !rosterText.trim())}
                         className={`w-full py-3 rounded-xl font-bold text-white shadow-lg transition-all ${
                             files.length === 0 || isProcessing || (mode === 'missing' && !rosterText.trim())
-                            ? 'bg-slate-300 cursor-not-allowed' 
+                            ? 'bg-slate-300 cursor-not-allowed'
                             : mode === 'deep_research' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:scale-105'
                             : 'bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] hover:scale-105'
                         }`}
                     >
-                        {isProcessing ? 'AI 正在分析...' : getActionName()}
+                        {isProcessing ? 'AI 正在处理...' : getActionName()}
                     </button>
 
                     {mode === 'rename' && files.some(f => f.status === 'done') && (
@@ -1008,7 +1226,79 @@ const MultiDocProcessor: React.FC = () => {
         </div>
       )}
 
-      {/* Create Template Modal */}
+     {/* History Modal */}
+     {showHistory && (
+         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/20 backdrop-blur-sm">
+             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200">
+                 <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+                     <h3 className="font-bold text-slate-800 text-lg flex items-center">
+                         <svg className="w-5 h-5 mr-2 text-[var(--primary-color)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                         历史记录
+                     </h3>
+                     <button onClick={() => setShowHistory(false)} className="text-slate-400 hover:text-slate-600">
+                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                     </button>
+                 </div>
+                 <div className="p-6 max-h-[600px] overflow-y-auto custom-scrollbar">
+                     {history.length === 0 ? (
+                         <div className="text-center py-12 text-slate-400">
+                             <svg className="w-16 h-16 mx-auto mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                             <p className="text-sm">暂无历史记录</p>
+                         </div>
+                     ) : (
+                         <div className="space-y-3">
+                             {history.map((item) => (
+                                 <div
+                                     key={item.id}
+                                     className="bg-slate-50 border border-slate-200 rounded-xl p-4 hover:shadow-md hover:border-[var(--primary-color)] transition-all group"
+                                 >
+                                     <div className="flex justify-between items-start mb-2">
+                                         <div className="flex items-center space-x-2">
+                                             <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                                 item.mode === 'report' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                                             }`}>
+                                                 {item.mode === 'report' ? '📊 周报' : '🔬 深度调研'}
+                                             </span>
+                                             <span className="text-xs text-slate-500">
+                                                 {new Date(item.timestamp).toLocaleString('zh-CN')}
+                                             </span>
+                                             <span className="text-xs text-slate-400">
+                                                 {item.fileCount} 个文件
+                                             </span>
+                                         </div>
+                                         <div className="flex items-center space-x-2">
+                                             <button
+                                                 onClick={() => deleteHistoryItem(item.id)}
+                                                 className="text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                                                 title="删除"
+                                             >
+                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                             </button>
+                                         </div>
+                                     </div>
+                                     <div className="bg-white border border-slate-100 rounded-lg p-3 text-sm text-slate-600 max-h-24 overflow-y-auto custom-scrollbar line-clamp-4">
+                                         {item.result.substring(0, 200)}...
+                                     </div>
+                                     <button
+                                         onClick={() => loadFromHistory(item)}
+                                         className="mt-3 w-full py-2 bg-white border border-[var(--primary-color)] text-[var(--primary-color)] hover:bg-[var(--primary-color)] hover:text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center"
+                                     >
+                                         <svg className="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                         加载此记录
+                                     </button>
+                                 </div>
+                             ))}
+                         </div>
+                     )}
+                 </div>
+                 <div className="bg-slate-50 px-6 py-3 border-t border-slate-100 text-center">
+                     <p className="text-[10px] text-slate-400">* 历史记录仅保存在本地浏览器，最多保留 5 条</p>
+                 </div>
+             </div>
+         </div>
+     )}
+
+     {/* Create Template Modal */}
       {isCreatingTemplate && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/20 backdrop-blur-sm">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200">
