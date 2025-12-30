@@ -15,7 +15,7 @@ import { WordTemplate } from '../../types';
 declare const pdfjsLib: any;
 declare const XLSX: any;
 
-type Mode = 'rename' | 'report' | 'missing' | 'deep_research';
+type Mode = 'deep_research' | 'report' | 'missing' | 'rename';
 
 interface FileItem {
   file: File;
@@ -791,11 +791,12 @@ const MultiDocProcessor: React.FC = () => {
       {/* Mode Switcher */}
       <div className="flex justify-center mb-8 overflow-x-auto">
         <div className="bg-slate-100 p-1 rounded-xl flex space-x-1 shadow-inner shrink-0">
-          <button
-            onClick={() => { setMode('rename'); clearFiles(); }}
-            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${mode === 'rename' ? 'bg-white text-[var(--primary-color)] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+           <button
+            onClick={() => { setMode('deep_research'); clearFiles(); }}
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap flex items-center ${mode === 'deep_research' ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}
           >
-            📂 智能重命名
+            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
+            Deep Research
           </button>
           <button
             onClick={() => { setMode('report'); clearFiles(); }}
@@ -809,12 +810,11 @@ const MultiDocProcessor: React.FC = () => {
           >
             📋 查缺补漏
           </button>
-           <button
-            onClick={() => { setMode('deep_research'); clearFiles(); }}
-            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap flex items-center ${mode === 'deep_research' ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}
+          <button
+            onClick={() => { setMode('rename'); clearFiles(); }}
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${mode === 'rename' ? 'bg-white text-[var(--primary-color)] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
-            Deep Research
+            📂 智能重命名
           </button>
         </div>
       </div>
