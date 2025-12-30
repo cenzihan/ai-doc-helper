@@ -113,6 +113,9 @@ const FormulaOCR: React.FC<FormulaOCRProps> = ({ onResult }) => {
                 canvas.height = height;
                 const ctx = canvas.getContext('2d');
                 if (!ctx) { reject(new Error("Could not get canvas context")); return; }
+                // Fill white background for transparency
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, width, height);
                 ctx.drawImage(img, 0, 0, width, height);
                 const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
                 resolve(compressedDataUrl);
@@ -123,6 +126,186 @@ const FormulaOCR: React.FC<FormulaOCRProps> = ({ onResult }) => {
         reader.onerror = (e) => reject(e);
         reader.readAsDataURL(file);
     });
+  };
+
+  // --- Sample Generators (Canvas) ---
+  
+  const createFormulaSampleImage = (): string => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 600;
+    canvas.height = 300;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 600, 300);
+
+    ctx.fillStyle = '#64748b';
+    ctx.font = 'bold 20px Helvetica, Arial, sans-serif';
+    ctx.fillText('Sample: Quadratic Formula', 20, 40);
+
+    ctx.fillStyle = '#000000';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2.5;
+
+    ctx.font = 'italic 40px "Times New Roman", serif';
+    ctx.fillText('x =', 60, 160);
+
+    ctx.beginPath();
+    ctx.moveTo(130, 148);
+    ctx.lineTo(440, 148);
+    ctx.stroke();
+
+    ctx.font = 'italic 36px "Times New Roman", serif';
+    ctx.fillText('-b ±', 145, 125);
+
+    ctx.beginPath();
+    ctx.moveTo(235, 105);
+    ctx.lineTo(250, 135); 
+    ctx.lineTo(265, 85);  
+    ctx.lineTo(430, 85);  
+    ctx.stroke();
+
+    ctx.fillText('b', 280, 125);
+    ctx.font = 'italic 22px "Times New Roman", serif';
+    ctx.fillText('2', 300, 105);
+    ctx.font = 'italic 36px "Times New Roman", serif';
+    ctx.fillText('- 4ac', 320, 125);
+
+    ctx.fillText('2a', 265, 200);
+
+    return canvas.toDataURL('image/png');
+  };
+
+  const createTableSampleImage = (): string => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 600;
+    canvas.height = 500;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 600, 500);
+
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 32px Helvetica, Arial, sans-serif';
+    ctx.fillText('Nutrition Facts', 20, 50);
+    ctx.font = '24px "Noto Sans SC", sans-serif';
+    ctx.fillText('营养成分表', 20, 85);
+
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(20, 100);
+    ctx.lineTo(580, 100);
+    ctx.stroke();
+
+    ctx.lineWidth = 1;
+    let y = 140;
+    const drawRow = (label: string, value: string, bold = false) => {
+        ctx.font = bold ? 'bold 20px sans-serif' : '20px sans-serif';
+        ctx.fillText(label, 20, y);
+        ctx.fillText(value, 450, y);
+        
+        ctx.beginPath();
+        ctx.moveTo(20, y + 10);
+        ctx.lineTo(580, y + 10);
+        ctx.strokeStyle = '#cccccc';
+        ctx.stroke();
+        y += 40;
+    };
+
+    drawRow('Serving Size (食用分量)', '100g', true);
+    drawRow('Calories (能量)', '2000 kJ', true);
+    
+    y -= 25;
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#000000';
+    ctx.beginPath();
+    ctx.moveTo(20, y + 10);
+    ctx.lineTo(580, y + 10);
+    ctx.stroke();
+    y += 40;
+
+    drawRow('Total Fat (脂肪)', '15 g', true);
+    drawRow('   Saturated Fat (饱和脂肪)', '2 g');
+    drawRow('Cholesterol (胆固醇)', '0 mg', true);
+    drawRow('Sodium (钠)', '160 mg', true);
+    drawRow('Total Carbohydrate (碳水)', '45 g', true);
+
+    y += 20;
+    ctx.font = '14px sans-serif';
+    ctx.fillText('* The % Daily Value (DV) tells you how much a nutrient in', 20, y);
+    ctx.fillText('a serving of food contributes to a daily diet.', 20, y + 20);
+
+    return canvas.toDataURL('image/png');
+  };
+
+  const createHandwritingSampleImage = (): string => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 500;
+    canvas.height = 500;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+
+    // Yellow note background
+    ctx.fillStyle = '#fef3c7'; 
+    ctx.fillRect(0, 0, 500, 500);
+
+    // Lines
+    ctx.strokeStyle = '#d4d4d8';
+    ctx.lineWidth = 1;
+    for (let i = 80; i < 500; i += 40) {
+        ctx.beginPath();
+        ctx.moveTo(20, i);
+        ctx.lineTo(480, i);
+        ctx.stroke();
+    }
+
+    ctx.fillStyle = '#1e3a8a'; 
+    ctx.font = '28px "Comic Sans MS", "Chalkboard SE", "Marker Felt", sans-serif'; 
+    
+    const lines = [
+        "Meeting Notes - 10/24",
+        "",
+        "1. Finalize the UI design for",
+        "   the mobile app.",
+        "2. Review API endpoints with",
+        "   the backend team.",
+        "3. Buy coffee beans!! ☕",
+        "",
+        "- John"
+    ];
+
+    let startY = 70;
+    lines.forEach(line => {
+        ctx.fillText(line, 40, startY);
+        startY += 40;
+    });
+
+    return canvas.toDataURL('image/png');
+  };
+
+  // Load Sample Logic
+  const handleLoadSample = async () => {
+      if (mode === 'pdf') {
+          alert('PDF 模式暂不支持加载示例，请手动上传 PDF 文件。');
+          return;
+      }
+      
+      let sampleDataUrl = '';
+      try {
+          if (mode === 'formula') sampleDataUrl = createFormulaSampleImage();
+          else if (mode === 'table') sampleDataUrl = createTableSampleImage();
+          else if (mode === 'handwriting') sampleDataUrl = createHandwritingSampleImage();
+          
+          if (sampleDataUrl) {
+              setImage(sampleDataUrl);
+              resetResults();
+          }
+      } catch (e) {
+          console.error("Sample generation failed", e);
+          alert("无法生成示例图片");
+      }
   };
 
   const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
@@ -288,7 +471,7 @@ const FormulaOCR: React.FC<FormulaOCRProps> = ({ onResult }) => {
         try {
             const prompt = `Analyze this PDF page. Count ONLY the distinct images/figures/charts (exclude logos). Respond with ONLY a single number.`;
             const response = await generateContent({ apiKey: config.apiKey, model: config.model, baseUrl: config.baseUrl, image: pageImages[i], mimeType: 'image/jpeg', prompt });
-            const match = response.match(/\d+/);
+            const match = (response as string).match(/\d+/);
             imageCounts.push(match ? parseInt(match[0]) : 0);
         } catch { imageCounts.push(0); }
     }
@@ -348,9 +531,7 @@ const FormulaOCR: React.FC<FormulaOCRProps> = ({ onResult }) => {
                 for await (const chunk of stream) {
                     pageMarkdown += chunk;
                     // Update streaming display
-                    setStreamingMarkdown(prev => {
-                        return prev; 
-                    });
+                    setStreamingMarkdown(prev => prev); 
                 }
 
                 // Post-process page markdown
@@ -385,7 +566,7 @@ const FormulaOCR: React.FC<FormulaOCRProps> = ({ onResult }) => {
                 pageMarkdowns.push(processed);
                 fullMarkdown += processed + '\n\n---\n\n';
                 
-                // Update live markdown view
+                // Update live markdown view with valid image syntax
                 setStreamingMarkdown(fullMarkdown);
             }
 
@@ -422,8 +603,11 @@ const FormulaOCR: React.FC<FormulaOCRProps> = ({ onResult }) => {
 
     try {
       const split = image.split(',');
+      const meta = split[0];
       const base64Data = split[1];
-      const mimeType = split[0].match(/data:([^;]+);/)?.[1] || 'image/png';
+      let mimeType = 'image/png';
+      const mimeMatch = meta.match(/data:([^;]+);/);
+      if (mimeMatch) mimeType = mimeMatch[1];
 
       if (mode === 'formula') {
           const responseText = await generateContent({
@@ -488,7 +672,7 @@ const FormulaOCR: React.FC<FormulaOCRProps> = ({ onResult }) => {
               if (pdfResult.extractedImages[idx]) {
                   return `![${alt}](data:image/png;base64,${pdfResult.extractedImages[idx].data})`;
               }
-              return match; // Keep original if no image found (or maybe remove url)
+              return match; // Keep original if no image found
           });
           onResult(finalMarkdown);
       }
@@ -549,12 +733,25 @@ const FormulaOCR: React.FC<FormulaOCRProps> = ({ onResult }) => {
                   </>
                 ) : (
                   <div className="text-center cursor-pointer p-10" onClick={() => fileInputRef.current?.click()}>
-                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4 text-slate-400 mx-auto group-hover:text-[var(--primary-color)] group-hover:bg-[var(--primary-50)] transition-all">
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform ${mode === 'table' ? 'bg-green-50 text-green-600' : mode === 'handwriting' ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-400 group-hover:text-[var(--primary-color)] group-hover:bg-[var(--primary-50)]'}`}>
                         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                     </div>
                     <h4 className="text-slate-800 font-bold text-xl mb-2">粘贴截图或点击上传</h4>
                     <p className="text-slate-400 text-sm">支持 PNG/JPG (自动压缩)</p>
                     <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
+                    
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); handleLoadSample(); }}
+                        className={`mt-4 px-3 py-1 text-xs border rounded-full transition-all ${
+                            mode === 'table' 
+                            ? 'text-green-600 border-green-600 bg-white hover:bg-green-600 hover:text-white' 
+                            : mode === 'handwriting'
+                            ? 'text-amber-600 border-amber-600 bg-white hover:bg-amber-600 hover:text-white'
+                            : 'text-[var(--primary-color)] border-[var(--primary-color)] bg-white hover:bg-[var(--primary-color)] hover:text-white'
+                        }`}
+                    >
+                        加载测试图片 (Sample)
+                    </button>
                   </div>
                 )}
               </div>
