@@ -16,7 +16,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
     switch (activeTab) {
       case 'about':
         return (
-          <div className="space-y-4 animate-in fade-in duration-300 h-[300px] overflow-y-auto custom-scrollbar pr-2">
+          <div className="space-y-4 animate-in fade-in duration-300 h-[540px] overflow-y-auto custom-scrollbar pr-2">
             <div className="flex flex-col items-center mb-6">
               <div className="w-16 h-16 mb-4 flex items-center justify-center">
                 {!logoError ? (
@@ -36,8 +36,58 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
               <p className="text-slate-500 text-sm">V2.0 Professional</p>
             </div>
             <p className="text-slate-600 leading-relaxed text-sm">
-              AI Doc Helper 是一个专注于学术与专业文档处理的智能助手。我们致力于通过先进的人工智能技术，解决 Markdown 到 Word 转换过程中的排版痛点，提供公式识别、格式清洗、学术润色以及微信公众号一键排版服务。
+              AI Doc Helper 是一款专为学术与专业文档处理打造的智能助手。我们融合前沿 AI 技术，专注解决 Markdown 到 Word 转换中的排版难题，提供 AI 视觉识别（公式/表格/ handwritten）、多文档智能处理、深度调研报告生成、AI 学术润色及公众号一键排版等全方位功能，让文档创作更高效、更专业。
             </p>
+            
+            <div className="mt-6 space-y-3">
+              <h4 className="font-bold text-slate-800 text-sm">核心功能</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white p-3 rounded-lg border border-slate-100 hover:border-[var(--primary-color)] transition-colors">
+                  <div className="flex items-center mb-1">
+                    <span className="text-[var(--primary-color)] mr-2">📝</span>
+                    <span className="font-bold text-slate-700 text-xs">编辑器 AI 助手</span>
+                  </div>
+                  <p className="text-slate-500 text-xs">智能写作建议、学术润色、自定义AI助手</p>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-slate-100 hover:border-[var(--primary-color)] transition-colors">
+                  <div className="flex items-center mb-1">
+                    <span className="text-[var(--primary-color)] mr-2">👁️</span>
+                    <span className="font-bold text-slate-700 text-xs">AI 视觉识别</span>
+                  </div>
+                  <p className="text-slate-500 text-xs">公式、表格、手写和PDF识别</p>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-slate-100 hover:border-[var(--primary-color)] transition-colors">
+                  <div className="flex items-center mb-1">
+                    <span className="text-[var(--primary-color)] mr-2">📚</span>
+                    <span className="font-bold text-slate-700 text-xs">多文档处理</span>
+                  </div>
+                  <p className="text-slate-500 text-xs">智能重命名、批量报告聚合、自定义多文档处理</p>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-slate-100 hover:border-[var(--primary-color)] transition-colors">
+                  <div className="flex items-center mb-1">
+                    <span className="text-[var(--primary-color)] mr-2">🔍</span>
+                    <span className="font-bold text-slate-700 text-xs">AI 深度调研</span>
+                  </div>
+                  <p className="text-slate-500 text-xs">自动化报告生成</p>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-slate-100 hover:border-[var(--primary-color)] transition-colors">
+                  <div className="flex items-center mb-1">
+                    <span className="text-[var(--primary-color)] mr-2">📄</span>
+                    <span className="font-bold text-slate-700 text-xs">Word 预览导出</span>
+                  </div>
+                  <p className="text-slate-500 text-xs">完美还原格式、原生公式</p>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-slate-100 hover:border-[var(--primary-color)] transition-colors">
+                  <div className="flex items-center mb-1">
+                    <span className="text-[var(--primary-color)] mr-2">⚙️</span>
+                    <span className="font-bold text-slate-700 text-xs">Prompt开放自配置接口</span>
+                  </div>
+                  <p className="text-slate-500 text-xs">自定义AI提示词模板</p>
+                </div>
+                
+              </div>
+            </div>
+            
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mt-4">
               <h4 className="font-bold text-slate-800 text-sm mb-2">开发者寄语</h4>
               <p className="text-slate-500 text-xs italic">
@@ -64,7 +114,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
         );
       case 'privacy':
         return (
-          <div className="space-y-4 animate-in fade-in duration-300 h-[300px] overflow-y-auto custom-scrollbar pr-2">
+          <div className="space-y-4 animate-in fade-in duration-300 h-[540px] overflow-y-auto custom-scrollbar pr-2">
             <h3 className="text-lg font-bold text-slate-900">隐私政策 (Privacy Policy)</h3>
             <p className="text-xs text-slate-500 mb-4">生效日期：2025年12月1日</p>
             
@@ -93,7 +143,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
         );
       case 'terms':
         return (
-          <div className="space-y-4 animate-in fade-in duration-300 h-[300px] overflow-y-auto custom-scrollbar pr-2">
+          <div className="space-y-4 animate-in fade-in duration-300 h-[540px] overflow-y-auto custom-scrollbar pr-2">
             <h3 className="text-lg font-bold text-slate-900">服务条款 (Terms of Service)</h3>
             
             <div className="text-sm text-slate-600 space-y-4">
@@ -121,7 +171,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
         );
       case 'faq':
         return (
-          <div className="space-y-4 animate-in fade-in duration-300 h-[300px] overflow-y-auto custom-scrollbar pr-2">
+          <div className="space-y-4 animate-in fade-in duration-300 h-[540px] overflow-y-auto custom-scrollbar pr-2">
             <h3 className="text-lg font-bold text-slate-900">常见问题 (FAQ)</h3>
             <div className="space-y-3">
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
@@ -140,6 +190,33 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                   <a href="https://www.aliyun.com/product/dashscope" target="_blank" rel="noopener noreferrer" className="text-[var(--primary-color)] hover:underline font-medium">
                     • 通义千问
                   </a>
+                  <br />
+                  
+                  <span className="font-bold text-slate-600">💡 重要提示：</span>
+                  <span className="text-slate-500">使用AI视觉识别（公式识别、表格识别等）功能时，请选择具备视觉能力的模型（如 GPT-4V、Qwen-VL、DeepSeek-VL 等多模态模型）。不同模型的识别准确率与效果可能存在差异，建议根据实际需求选择合适的模型。</span>
+                </p>
+              </div>
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                <p className="font-bold text-slate-800 text-xs mb-1">Q: 如何配置API？</p>
+                <p className="text-slate-500 text-xs leading-relaxed">
+                  A: 点击页面右上角的用户头像（显示为 Pro User 或 No Key），进入个性化配置界面。在对话框中可以填写：
+                  
+                  <span className="block mt-2 font-medium text-slate-600">• Base URL：API 请求的基础地址</span>
+                  <span className="block font-medium text-slate-600">• API Key：用于身份验证的密钥</span>
+                  <span className="block font-medium text-slate-600">• 自定义模型：填写模型 ID（如 deepseek-chat）或从预设模型中选择</span>
+                  
+                  <span className="block mt-2 text-slate-600">💡 <span className="font-bold">注意：</span>costrict比赛版本已内嵌免费 API 供体验使用，如无特殊需求，无需额外配置即可正常使用所有功能。</span>
+                </p>
+              </div>
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                <p className="font-bold text-slate-800 text-xs mb-1">Q: 使用成本如何？</p>
+                <p className="text-slate-500 text-xs leading-relaxed">
+                  A: 以硅基流动平台的 Qwen/Qwen3-VL-30B-A3B-Instruct 模型（2.8元/M Tokens）为例，1元人民币可实现的使用次数如下（具体次数根据实际输入输出的 token 数量会有所波动）：
+                  <br />
+                  <span className="block mt-2 font-medium text-slate-600">• 编辑器 AI 助手：约 500 次</span>
+                  <span className="block font-medium text-slate-600">• AI 视觉识别：约 1400 次</span>
+                  <span className="block font-medium text-slate-600">• 多文档智能处理：约 500 次</span>
+                  <span className="block font-medium text-slate-600">• AI 深度调研：约 50 次</span>
                 </p>
               </div>
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
@@ -162,15 +239,15 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
 
   const tabs = [
     { id: 'about', label: '关于我们' },
+    { id: 'faq', label: '常见问题' },
     { id: 'privacy', label: '隐私政策' },
     { id: 'terms', label: '服务条款' },
-    { id: 'faq', label: '常见问题' },
   ];
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose}></div>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl relative z-10 flex overflow-hidden h-[450px]">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl relative z-10 flex overflow-hidden h-[600px]">
         
         {/* Sidebar */}
         <div className="w-48 bg-slate-50 border-r border-slate-200 p-4 flex flex-col">
