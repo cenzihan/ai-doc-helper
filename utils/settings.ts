@@ -5,28 +5,28 @@ export const AVAILABLE_MODELS = [
     name: 'Qwen3 VL 30B (Instruct)',
     type: 'multimodal',
     baseUrl: 'https://api.siliconflow.cn/v1/chat/completions',
-    defaultKey: ''
+    defaultKey: 'sk-abnctgyegfpfzfhdhcwclddnrthppaptxxgdipzpejlniptf'
   },
   {
     id: 'Qwen/Qwen3-VL-235B-A22B-Instruct',
     name: 'Qwen3 VL 235B-A22B (Instruct)',
     type: 'multimodal',
     baseUrl: 'https://api.siliconflow.cn/v1/chat/completions',
-    defaultKey: ''
+    defaultKey: 'sk-abnctgyegfpfzfhdhcwclddnrthppaptxxgdipzpejlniptf'
   },
   {
     id: 'Pro/zai-org/GLM-4.7',
     name: 'GLM 4.7',
     type: 'multimodal',
     baseUrl: 'https://api.siliconflow.cn/v1/chat/completions',
-    defaultKey: ''
+    defaultKey: 'sk-abnctgyegfpfzfhdhcwclddnrthppaptxxgdipzpejlniptf'
   },
   {
     id: 'deepseek-ai/deepseek-vl2',
     name: 'DeepSeek VL2',
     type: 'multimodal',
     baseUrl: 'https://api.siliconflow.cn/v1/chat/completions',
-    defaultKey: ''
+    defaultKey: 'sk-abnctgyegfpfzfhdhcwclddnrthppaptxxgdipzpejlniptf'
   }
 ];
 
