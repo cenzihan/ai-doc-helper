@@ -1,3 +1,4 @@
+import { getRuntimeApiKey } from './runtimeConfig';
 
 type ModelType = 'text' | 'multimodal';
 
@@ -86,7 +87,7 @@ export const getModelConfig = (taskType: 'ocr' | 'text' = 'text') => {
   
   if (preset && !baseUrl) baseUrl = preset.baseUrl;
   
-  if (!apiKey) apiKey = process.env.API_KEY || '';
+  if (!apiKey) apiKey = getRuntimeApiKey();
   
   return {
     model: modelId,
