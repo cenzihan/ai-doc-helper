@@ -1,34 +1,53 @@
 
-export const AVAILABLE_MODELS = [
+type ModelType = 'text' | 'multimodal';
+
+type ModelPreset = {
+  id: string;
+  name: string;
+  type: ModelType;
+  baseUrl: string;
+};
+
+export const AVAILABLE_MODELS: ModelPreset[] = [
   {
-    id: 'Qwen/Qwen3-VL-30B-A3B-Instruct',
-    name: 'Qwen3 VL 30B (Instruct)',
-    type: 'multimodal',
-    baseUrl: 'https://api.siliconflow.cn/v1/chat/completions',
-    defaultKey: 'sk-abnctgyegfpfzfhdhcwclddnrthppaptxxgdipzpejlniptf'
+    id: 'MiniMaxAI/MiniMax-M2.5',
+    name: 'MiniMax M2.5',
+    type: 'text',
+    baseUrl: 'https://api.siliconflow.cn/v1/chat/completions'
   },
   {
-    id: 'Qwen/Qwen3-VL-235B-A22B-Instruct',
-    name: 'Qwen3 VL 235B-A22B (Instruct)',
+    id: 'Qwen/Qwen3.6-35B-A3B',
+    name: 'Qwen3.6 35B A3B',
     type: 'multimodal',
-    baseUrl: 'https://api.siliconflow.cn/v1/chat/completions',
-    defaultKey: 'sk-abnctgyegfpfzfhdhcwclddnrthppaptxxgdipzpejlniptf'
+    baseUrl: 'https://api.siliconflow.cn/v1/chat/completions'
   },
   {
     id: 'Pro/zai-org/GLM-4.7',
     name: 'GLM 4.7',
-    type: 'multimodal',
-    baseUrl: 'https://api.siliconflow.cn/v1/chat/completions',
-    defaultKey: 'sk-abnctgyegfpfzfhdhcwclddnrthppaptxxgdipzpejlniptf'
+    type: 'text',
+    baseUrl: 'https://api.siliconflow.cn/v1/chat/completions'
   },
   {
-    id: 'deepseek-ai/deepseek-vl2',
-    name: 'DeepSeek VL2',
+    id: 'Qwen/Qwen3.6-27B',
+    name: 'Qwen3.6 27B',
     type: 'multimodal',
-    baseUrl: 'https://api.siliconflow.cn/v1/chat/completions',
-    defaultKey: 'sk-abnctgyegfpfzfhdhcwclddnrthppaptxxgdipzpejlniptf'
+    baseUrl: 'https://api.siliconflow.cn/v1/chat/completions'
+  },
+  {
+    id: 'deepseek-ai/DeepSeek-V4-Flash',
+    name: 'DeepSeek V4 Flash',
+    type: 'text',
+    baseUrl: 'https://api.siliconflow.cn/v1/chat/completions'
   }
 ];
+
+const getDefaultModelId = (taskType: 'ocr' | 'text' = 'text'): string => {
+  if (taskType === 'ocr') {
+    return AVAILABLE_MODELS.find(model => model.type === 'multimodal')?.id || AVAILABLE_MODELS[0].id;
+  }
+
+  return AVAILABLE_MODELS[0].id;
+};
 
 export const THEME_PRESETS = [
   { id: 'blue', color: '#2563eb', hover: '#1d4ed8', light: '#eff6ff' },
@@ -43,10 +62,17 @@ export const getEffectiveModel = (taskType: 'ocr' | 'text' = 'text'): string => 
   if (taskType === 'ocr') {
     const ocrModel = localStorage.getItem('user_model_ocr');
     if (ocrModel && ocrModel.trim() !== '') return ocrModel;
+
+    const userModel = localStorage.getItem('user_model');
+    const userPreset = AVAILABLE_MODELS.find(model => model.id === userModel);
+    if (!userPreset && userModel) return userModel;
+    if (userPreset?.type === 'multimodal') return userModel;
+
+    return getDefaultModelId('ocr');
   }
   const userModel = localStorage.getItem('user_model');
   if (userModel) return userModel;
-  return AVAILABLE_MODELS[0].id;
+  return getDefaultModelId(taskType);
 };
 
 export const getModelConfig = (taskType: 'ocr' | 'text' = 'text') => {
@@ -58,10 +84,7 @@ export const getModelConfig = (taskType: 'ocr' | 'text' = 'text') => {
   let apiKey = userKey || '';
   let baseUrl = userUrl || '';
   
-  if (preset) {
-    if (!apiKey && preset.defaultKey) apiKey = preset.defaultKey;
-    if (!baseUrl && preset.baseUrl) baseUrl = preset.baseUrl;
-  }
+  if (preset && !baseUrl) baseUrl = preset.baseUrl;
   
   if (!apiKey) apiKey = process.env.API_KEY || '';
   
@@ -116,7 +139,7 @@ export const DEFAULT_SERPER_KEY = '';
 export const getUserSettings = () => {
   return {
     apiKey: localStorage.getItem('user_api_key') || '',
-    model: localStorage.getItem('user_model') || AVAILABLE_MODELS[0].id,
+    model: localStorage.getItem('user_model') || getDefaultModelId('text'),
     ocrModel: localStorage.getItem('user_model_ocr') || '',
     baseUrl: localStorage.getItem('user_base_url') || '',
     theme: localStorage.getItem('user_theme') || 'blue',
